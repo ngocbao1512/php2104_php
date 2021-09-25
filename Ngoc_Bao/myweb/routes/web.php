@@ -24,7 +24,7 @@ use App\Http\Controllers\ProfileController;
 
 Route::get('/', function () {
     return view('welcome');
-});
+})->name('welcome');
 
 Route::get('/dashboard', function () {
     return view('dashboard');
@@ -87,7 +87,8 @@ Route::get('/blog-single-ms/{id?}',[BlogController::class,'show'])
 
 /* admin manager product */
 
-Route::resource('products',AdminProductController::class);
+Route::resource('products',AdminProductController::class)
+    ->middleware('auth');
 
 
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () {
