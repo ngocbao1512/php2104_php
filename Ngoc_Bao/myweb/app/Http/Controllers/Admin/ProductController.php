@@ -7,16 +7,22 @@ use App\Http\Controllers\Auth;
 use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\ProductHistory;
+use App\Models\ProductHistoryDetail;
 
 class ProductController extends Controller
 {
     protected $modelProduct;
     protected $modelCategory;
+    protected $modelProductHistory;
+    protected $modelProductHistoryDetail;
 
-    public function __construct(Product $product, Category $category)
+    public function __construct(Product $product, Category $category, ProductHistory $producthistory, ProductHistoryDetail $producthistorydetail)
     {
         $this->modelProduct = $product;
         $this->modelCategory = $category;
+        $this->modelProductHistory = $producthistory;
+        $this->modelProductHistoryDetail = $producthistorydetail;
     }
 
     public function index()
@@ -45,7 +51,7 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        $data = $data = $request->only([
+        $data  = $request->only([
             'category_id',
             'name',
             'description',
@@ -54,15 +60,34 @@ class ProductController extends Controller
             'sale_off',
             'is_public',
         ]);
+        
 
         $data['category_id'] = (int) $data['category_id'];
         $data['is_public'] = isset($data['is_public']) ? (int) $data['is_public'] : 0;
         $data['user_id'] = auth()->id();
 
+        $data_history_product = [];
+
         
         try {
             $product = $this->modelProduct->create($data);
             $msg = 'Create product success.';
+
+            /* 
+            * create product history 
+            */
+            
+            $data_history_product['user_id'] = auth()->id();
+            
+            $data_history_product['product_id'] = $product->id;
+            
+            $producthistory = $this->modelProductHistory->create($data_history_product);
+            /* 
+            * create product history detail
+            */
+            unset($data['user_id']);
+            $data['product_history_id'] = $producthistory->id;
+            $producthistorydetail = $this->modelProductHistoryDetail->create($data);
 
             return redirect()
                 ->route('products.show', ['product' => $product->id])
@@ -83,10 +108,15 @@ class ProductController extends Controller
     {
         $user = \Auth::user();
         $product = $this->modelProduct->findOrFail($id);
+        $producthistory = $this->modelProductHistory->where('product_id', $product->id)->first();
+        
+        $producthistorydetails = $producthistory->producthistorydetails->toArray();
 
         return view('admin.products.show',[
             'product'=>$product,
-            'user' => $user
+            'user' => $user,
+            'producthistory' => $producthistory,
+            'producthistorydetails' => $producthistorydetails,
         ]);
     }
 
@@ -107,8 +137,8 @@ class ProductController extends Controller
     public function update(Request $request, $id)
     {
         $product = $this->modelProduct->findOrFail($id);
-        
-        $data = $data = $request->only([
+
+        $data = $request->only([
             'category_id',
             'name',
             'description',
@@ -120,17 +150,52 @@ class ProductController extends Controller
 
         $data['category_id'] = (int) $data['category_id'];
         $data['is_public'] = isset($data['is_public']) ? (int) $data['is_public'] : 0;
-        //$data['user_id'] = auth()->id();
-        $data['user_id'] = $product->user_id;
-
-       
+        $data['user_id'] = $product->id;
 
         try {
             $product->update($data);
-            $msg = 'update product success.';
+            $msg = 'Update product success.';
+
+
+            //  UPDATE PRODUCT HISTORY 
+            //
+            // find in table product_history collumn have user_id and product_id equal with $product->id and auth()->id
+            // if can't find,we have to create product_history then create product_history_Details
+
+
+            $producthistory = $this->modelProductHistory
+                                ->where('user_id', auth()->id())
+                                ->where('product_id', $product->id)
+                                ->get()
+                                ->toArray();
+            //dd($producthistory);
+
+            unset($data['user_id']);
+            if(count($producthistory) > 0) 
+            {
+
+                $data['product_history_id'] = $producthistory[0]['id'];
+                $producthistorydetail = $this->modelProductHistoryDetail->create($data);
+
+            } else 
+            {
+
+                $data_history_product['user_id'] = auth()->id();
+                
+                $data_history_product['product_id'] = $product->id;
+                
+                $product_history = $this->modelProductHistory->create($data_history_product);
+                /* 
+                * create product history detail
+                */
+                $data['product_history_id'] = $product_history->id;
+                $producthistorydetail = $this->modelProductHistoryDetail->create($data);
+
+            }
+
 
             return redirect()
-                ->route('products.index')
+                ->route('products.show', ['product' => $product->id])
                 ->with('msg', $msg);
         } catch (\Exception $e) {
             \Log::error($e);

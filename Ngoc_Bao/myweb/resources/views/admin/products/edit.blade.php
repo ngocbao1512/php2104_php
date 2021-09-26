@@ -62,11 +62,7 @@
                     </div>
                     <div class=" mt-4">
                         <span style="color: #bbb;">Profile Creator</span>
-                        <h4 class="mb-0">
-                        <a href="{{ route('profile-single-ms.show', ['product' => $product->user->id]) }}">
-                            {{ $product->user->name }}
-                        </a>
-                        </h4>
+                        
                     </div>
                     
                     <hr>
