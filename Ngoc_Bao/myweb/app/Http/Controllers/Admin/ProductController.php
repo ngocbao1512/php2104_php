@@ -17,31 +17,36 @@ class ProductController extends Controller
     protected $modelProductHistory;
     protected $modelProductHistoryDetail;
 
-    public function __construct(Product $product, Category $category, ProductHistory $producthistory, ProductHistoryDetail $producthistorydetail)
-    {
+    public function __construct(
+        Product $product,
+        Category $category,
+        ProductHistory $productHistory,
+        ProductHistoryDetail $productHistoryDetail
+        ){
         $this->modelProduct = $product;
         $this->modelCategory = $category;
-        $this->modelProductHistory = $producthistory;
-        $this->modelProductHistoryDetail = $producthistorydetail;
+        $this->modelProductHistory = $productHistory;
+        $this->modelProductHistoryDetail = $productHistoryDetail;
     }
 
     public function index()
     {
         //return view get data
-        $products = $this->modelProduct->paginate(10);
-        $user = \Auth::user();
+        $products = $this->modelProduct->paginate(config('product.paginate10'));
+        $user = auth()->user();
+
         return view('admin.products.index',[
             'products'=>$products,
             'user' => $user
-        
         ]);
     }
 
 
     public function create()
     {
-        $categories = $this->modelCategory::all();
-        $user = \Auth::user();
+        $categories = $this->modelCategory->all();
+        $user = auth()->user();
+
         return view('admin/products.create',[
             'categories' => $categories,
             'user' => $user
@@ -60,7 +65,6 @@ class ProductController extends Controller
             'sale_off',
             'is_public',
         ]);
-        
 
         $data['category_id'] = (int) $data['category_id'];
         $data['is_public'] = isset($data['is_public']) ? (int) $data['is_public'] : 0;
@@ -156,23 +160,16 @@ class ProductController extends Controller
             $product->update($data);
             $msg = 'Update product success.';
 
-
             //  UPDATE PRODUCT HISTORY 
-            //
-            // find in table product_history collumn have user_id and product_id equal with $product->id and auth()->id
-            // if can't find,we have to create product_history then create product_history_Details
-
-
+            
             $producthistory = $this->modelProductHistory
-                                ->where('user_id', auth()->id())
-                                ->where('product_id', $product->id)
-                                ->get()
-                                ->toArray();
-            //dd($producthistory);
+                ->where('user_id', auth()->id())
+                ->where('product_id', $product->id)
+                ->get()
+                ->toArray();
 
             unset($data['user_id']);
-            if(count($producthistory) > 0) 
-            {
+            if(count($producthistory) > 0) {
 
                 $data['product_history_id'] = $producthistory[0]['id'];
                 $producthistorydetail = $this->modelProductHistoryDetail->create($data);
@@ -180,19 +177,18 @@ class ProductController extends Controller
             } else 
             {
 
-                $data_history_product['user_id'] = auth()->id();
+                $productHistoryData['user_id'] = auth()->id();
                 
-                $data_history_product['product_id'] = $product->id;
+                $productHistoryData['product_id'] = $product->id;
                 
-                $product_history = $this->modelProductHistory->create($data_history_product);
+                $productHistory = $this->modelProductHistory->create($productHistoryData);
                 /* 
                 * create product history detail
                 */
-                $data['product_history_id'] = $product_history->id;
-                $producthistorydetail = $this->modelProductHistoryDetail->create($data);
+                $data['product_history_id'] = $productHistory->id;
+                $productHistoryDetail = $this->modelProductHistoryDetail->create($data);
 
             }
-
 
             return redirect()
                 ->route('products.show', ['product' => $product->id])
@@ -207,7 +203,6 @@ class ProductController extends Controller
             ->route('products.index')
             ->with('error', $error);
     }
-
 
     public function destroy($id)
     {
